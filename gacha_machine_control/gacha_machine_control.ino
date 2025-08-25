@@ -5,6 +5,14 @@
 #define IN1_PIN 13
 #define IN2_PIN 15
 #define LED_PIN 2
+#define SENSOR1_PIN 3
+
+// 狀態變數
+bool door1Unlocked = false;
+bool door2Unlocked = false;
+unsigned long unlockTime1 = 0;
+unsigned long unlockTime2 = 0;
+const unsigned long AUTO_LOCK_TIME = 5000; // 5秒自動上鎖
 
 void setup() {
   Serial.begin(115200);
@@ -20,6 +28,8 @@ void setup() {
   pinMode(IN1_PIN, OUTPUT);
   pinMode(IN2_PIN, OUTPUT);
   pinMode(LED_PIN, OUTPUT);
+  pinMode(SENSOR1_PIN, INPUT);
+  //pinMode(SENSOR2_PIN, INPUT);
 
   digitalWrite(IN1_PIN, LOW);
   digitalWrite(IN2_PIN, LOW);
@@ -36,38 +46,75 @@ void loop() {
   
   bool button1Pressed = !digitalRead(BUTTON1_PIN);
   bool button2Pressed = !digitalRead(BUTTON2_PIN);
+  bool sensor1 = digitalRead(SENSOR1_PIN);
+  // bool sensor2 = digitalRead(SENSOR2_PIN);
 
   if (button1Pressed) {
     Serial.println("Button1 pressed");
-    unlockDoor(IN1_PIN);
+    unlockDoor(IN1_PIN, &door1Unlocked, &unlockTime1);
+    Serial.println("Door1 unlocked");
   }
 
   if (button2Pressed) {
     Serial.println("Button2 pressed");
-    unlockDoor(IN2_PIN);
+    unlockDoor(IN2_PIN, &door2Unlocked, &unlockTime2);
+    Serial.println("Door2 unlocked");
   }
+
+  if (sensor1) {
+    Serial.println("Sensor1 blocked");
+    lockDoor(IN1_PIN, &door1Unlocked);
+    Serial.println("Door1 locked");
+  }
+
+  // if (sensor2) {
+  //   Serial.printIn("Sensor blocked");
+  //   lockDoor(IN2_PIN, door2Unlocked);
+  //   Serial.printIn("Door2 locked");
+  // }
+
+  checkAutoLock();
 
   delay(50);
   yield();
 }
 
-void unlockDoor(int PIN) {
-  digitalWrite(PIN, HIGH);
-  digitalWrite(LED_PIN, LOW);
+void unlockDoor(int PIN, bool* doorUnlock, unsigned long* unlockTime) {
+  *doorUnlock = true;
+  *unlockTime = millis();
 
-  // 分段延遲避免看門狗問題
-  for (int i = 0; i < 30; i++) {
-    delay(100);
-    yield();
-  }
+  digitalWrite(PIN, HIGH);
+  updateLED();
+}
+
+void lockDoor(int PIN, bool* doorUnlock)
+{
+  *doorUnlock = false;
 
   digitalWrite(PIN, LOW);
-  digitalWrite(LED_PIN, HIGH);
+  updateLED();
+}
 
-  Serial.println("Locked");
+void updateLED() {
+  if (door1Unlocked || door2Unlocked) {
+    digitalWrite(LED_PIN, LOW);   // 點亮LED
+  } else {
+    digitalWrite(LED_PIN, HIGH);  // 熄滅LED
+  }
+}
+
+void checkAutoLock() {
+  unsigned long currentTime = millis();
   
-  for (int i = 0; i < 10; i++) {
-    delay(100);
-    yield();
+  // 檢查Door1自動上鎖
+  if (door1Unlocked && (currentTime - unlockTime1 >= AUTO_LOCK_TIME)) {
+    Serial.println("Door1 auto-lock timeout");
+    lockDoor(IN1_PIN, &door1Unlocked);
+  }
+  
+  // 檢查Door2自動上鎖
+  if (door2Unlocked && (currentTime - unlockTime2 >= AUTO_LOCK_TIME)) {
+    Serial.println("Door2s auto-lock timeout");
+    lockDoor(IN2_PIN, &door2Unlocked);
   }
 }
