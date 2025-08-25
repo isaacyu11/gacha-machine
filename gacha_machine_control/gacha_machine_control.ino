@@ -1,11 +1,9 @@
-#include <ESP8266WiFi.h>
-
-#define BUTTON1_PIN 12
-#define BUTTON2_PIN 14
-#define IN1_PIN 13
-#define IN2_PIN 15
+#define BUTTON1_PIN 5
+#define BUTTON2_PIN 18
+#define IN1_PIN 22
+#define IN2_PIN 23
 #define LED_PIN 2
-#define SENSOR1_PIN 3
+#define SENSOR1_PIN 19
 
 // 狀態變數
 bool door1Unlocked = false;
@@ -16,12 +14,7 @@ const unsigned long AUTO_LOCK_TIME = 5000; // 5秒自動上鎖
 
 void setup() {
   Serial.begin(115200);
-  yield();
   delay(1000);
-  yield();
-
-  WiFi.mode(WIFI_OFF);
-  yield();
 
   pinMode(BUTTON1_PIN, INPUT_PULLUP);
   pinMode(BUTTON2_PIN, INPUT_PULLUP);
@@ -33,16 +26,14 @@ void setup() {
 
   digitalWrite(IN1_PIN, LOW);
   digitalWrite(IN2_PIN, LOW);
-  digitalWrite(LED_PIN, HIGH);
+  digitalWrite(LED_PIN, LOW);
 
   Serial.println("System started");
   Serial.println("Ready");
 
-  yield();
 }
 
 void loop() {
-  yield();
   
   bool button1Pressed = !digitalRead(BUTTON1_PIN);
   bool button2Pressed = !digitalRead(BUTTON2_PIN);
@@ -76,7 +67,6 @@ void loop() {
   checkAutoLock();
 
   delay(50);
-  yield();
 }
 
 void unlockDoor(int PIN, bool* doorUnlock, unsigned long* unlockTime) {
@@ -97,9 +87,9 @@ void lockDoor(int PIN, bool* doorUnlock)
 
 void updateLED() {
   if (door1Unlocked || door2Unlocked) {
-    digitalWrite(LED_PIN, LOW);   // 點亮LED
+    digitalWrite(LED_PIN, HIGH);   // 點亮LED
   } else {
-    digitalWrite(LED_PIN, HIGH);  // 熄滅LED
+    digitalWrite(LED_PIN, LOW);  // 熄滅LED
   }
 }
 
