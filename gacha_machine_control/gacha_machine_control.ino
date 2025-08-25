@@ -1,3 +1,6 @@
+#include <WiFi.h>
+#include <esp_now.h>
+
 #define BUTTON1_PIN 5
 #define BUTTON2_PIN 18
 #define IN1_PIN 22
@@ -11,6 +14,12 @@ bool door2Unlocked = false;
 unsigned long unlockTime1 = 0;
 unsigned long unlockTime2 = 0;
 const unsigned long AUTO_LOCK_TIME = 5000; // 5秒自動上鎖
+
+// 通訊結構 (必須與ESP8266相同)
+typedef struct {
+  int command;
+  char message[32];
+} LockCommand;
 
 void setup() {
   Serial.begin(115200);
@@ -28,9 +37,24 @@ void setup() {
   digitalWrite(IN2_PIN, LOW);
   digitalWrite(LED_PIN, LOW);
 
+  // 設定WiFi
+  WiFi.mode(WIFI_STA);
+  WiFi.disconnect();
+  delay(100);
+
+  // 初始化ESP-NOW
+  if (esp_now_init() != ESP_OK) {
+    Serial.println("ESP-NOW init fail");
+    return;
+  }
+
   Serial.println("System started");
   Serial.println("Ready");
 
+  // 註冊接收回調函數
+  esp_now_register_recv_cb(onDataReceived);
+  Serial.print("ESP32 MAC: ");
+  Serial.println(WiFi.macAddress());
 }
 
 void loop() {
@@ -106,5 +130,41 @@ void checkAutoLock() {
   if (door2Unlocked && (currentTime - unlockTime2 >= AUTO_LOCK_TIME)) {
     Serial.println("Door2s auto-lock timeout");
     lockDoor(IN2_PIN, &door2Unlocked);
+  }
+}
+
+// ESP-NOW接收回調函數
+void onDataReceived(const esp_now_recv_info *recv_info, const uint8_t *incomingData, int len) {
+  LockCommand receivedCommand;
+  memcpy(&receivedCommand, incomingData, sizeof(receivedCommand));
+
+  Serial.print("收到指令: ");
+  Serial.print(receivedCommand.command);
+  Serial.print(" - ");
+  Serial.println(receivedCommand.message);
+
+  // 處理指令
+  switch (receivedCommand.command) {
+    case 1:
+      if (!door1Unlocked) {
+        Serial.println("無線解鎖門1");
+        unlockDoor(IN1_PIN, &door1Unlocked, &unlockTime1);
+      } else {
+        Serial.println("門1已經解鎖");
+      }
+      break;
+      
+    case 2:
+      if (!door2Unlocked) {
+        Serial.println("無線解鎖門2");
+        unlockDoor(IN2_PIN, &door2Unlocked, &unlockTime2);
+      } else {
+        Serial.println("門2已經解鎖");
+      }
+      break;
+      
+    default:
+      Serial.println("未知指令");
+      break;
   }
 }
